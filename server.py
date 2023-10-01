@@ -59,15 +59,10 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
     
     def ServerPath(self, path):
-        handlers = [
-            (os.path.isdir, self.ServerDirectory),
-            (os.path.isfile, self.ServerFile),
-        ]
-
-        for check, action in handlers:
-            if check(path):
-                action(path)
-                return
+        if os.path.isdir(path):
+            self.ServerDirectory(path)
+        else:
+            self.ServerFile(path)
     
     def ValidPath(self, path):
         return path.startswith(self.BASE_DIR)
