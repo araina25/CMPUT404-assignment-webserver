@@ -33,54 +33,61 @@ class MyWebServer(socketserver.BaseRequestHandler):
     
     BASE_DIR = os.path.abspath('./www')
 
+
     def handle(self):
         self.data = self.request.recv(1024).strip().decode('utf-8')
         print(f"Got a request of: {self.data}\n")
 
-        if not self.is_get_request():
-            self.send_response(405, "Method Not Allowed")
+        if not self.GetRequest():
+            self.SendResponse(405, "Method Not Allowed")
             return
 
-        local_path = self.translate_path()
+        local_path = self.TranslatePath()
         
-        if not self.valid_path(local_path):
-            self.send_response(404, "Not Found")
+        if not self.ValidPath(local_path):
+            self.SendResponse(404, "Not Found")
             return
 
-        self.serve_path(local_path)
+        self.ServerPath(local_path)
 
-    def is_get_request(self):
-        return self.data.splitlines()[0].split(' ')[0] == 'GET'
-
-    def translate_path(self):
+    def TranslatePath(self):
         path = self.data.splitlines()[0].split(' ')[1]
         return os.path.abspath(os.path.join(self.BASE_DIR, path.lstrip('/')))
+    
+    def GetRequest(self):
+        return self.data.splitlines()[0].split(' ')[0] == 'GET'
 
-    def valid_path(self, path):
+    
+    def ServerPath(self, path):
+        handlers = [
+            (os.path.isdir, self.ServerDirectory),
+            (os.path.isfile, self.ServerFile),
+        ]
+
+        for check, action in handlers:
+            if check(path):
+                action(path)
+                return
+    
+    def ValidPath(self, path):
         return path.startswith(self.BASE_DIR)
 
-    def serve_path(self, path):
-        if os.path.isdir(path):
-            self.serve_directory(path)
-        else:
-            self.serve_file(path)
-
-    def serve_directory(self, path):
-        if not self.data.splitlines()[0].split(' ')[1].endswith('/'):
-            self.send_response(301, "Moved Permanently", location=self.data.splitlines()[0].split(' ')[1] + '/')
-            return
-        self.serve_file(os.path.join(path, 'index.html'))
-
-    def serve_file(self, path):
+    def ServerFile(self, path):
         mime_type, _ = mimetypes.guess_type(path)
         try:
             with open(path, 'r') as file:
                 content = file.read()
-            self.send_response(200, "OK", content, mime_type)
+            self.SendResponse(200, "OK", content, mime_type)
         except FileNotFoundError:
-            self.send_response(404, "Not Found")
+            self.SendResponse(404, "Not Found")
 
-    def send_response(self, status_code, status_message, content="", content_type="text/html", location=None):
+    def ServerDirectory(self, path):
+        if not self.data.splitlines()[0].split(' ')[1].endswith('/'):
+            self.SendResponse(301, "Moved Permanently", location=self.data.splitlines()[0].split(' ')[1] + '/')
+            return
+        self.ServerFile(os.path.join(path, 'index.html'))
+
+    def SendResponse(self, status_code, status_message, content="", content_type="text/html", location=None):
         headers = [
             f"HTTP/1.1 {status_code} {status_message}",
             f"Content-Type: {content_type}",
