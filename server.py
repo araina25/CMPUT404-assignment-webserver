@@ -29,30 +29,36 @@ import mimetypes
 # try: curl -v -X GET http://127.0.0.1:8080/
 
 
+#MyWebserver is a class containing methods relating to handling HTTP and handles and implements all the requirements in requirement.org
 class MyWebServer(socketserver.BaseRequestHandler):
     
-    BASE_DIR = os.path.abspath('./www')
+    #This is the abosulte path to the webserver(The servers root directory)
+    Initialised_Directory = os.path.abspath('./www')
 
 
+    #The main function in which all the functions are called into when a new HTTP request is recieved 
     def handle(self):
-        self.data = self.request.recv(1024).strip().decode('utf-8')
+        #Reading data from the Request 
+        self.data = self.request.recv(1024).strip().decode('utf-8')#Limiting to 1024 bytes
         print(f"Got a request of: {self.data}\n")
 
+        #Return a status code of "405 Method Not Allowed" for any method you cannot handle (POST/PUT/DELETE) 
         if not self.GetRequest():
             self.SendResponse(405, "Method Not Allowed")
             return
 
-        local_path = self.TranslatePath()
         
-        if not self.ValidPath(local_path):
+        host_path = self.TranslatePath()
+        
+        if not self.ValidPath(host_path):
             self.SendResponse(404, "Not Found")
             return
 
-        self.ServerPath(local_path)
+        self.ServerPath(host_path)
 
     def TranslatePath(self):
         path = self.data.splitlines()[0].split(' ')[1]
-        return os.path.abspath(os.path.join(self.BASE_DIR, path.lstrip('/')))
+        return os.path.abspath(os.path.join(self.Initialised_Directory, path.lstrip('/')))
     
     def GetRequest(self):
         return self.data.splitlines()[0].split(' ')[0] == 'GET'
@@ -65,16 +71,18 @@ class MyWebServer(socketserver.BaseRequestHandler):
             self.ServerFile(path)
     
     def ValidPath(self, path):
-        return path.startswith(self.BASE_DIR)
+        return path.startswith(self.Initialised_Directory)
 
     def ServerFile(self, path):
-        mime_type, _ = mimetypes.guess_type(path)
-        try:
+        mtype, _ = mimetypes.guess_type(path)
+
+        if os.path.exists(path) and os.path.isfile(path):
             with open(path, 'r') as file:
                 content = file.read()
-            self.SendResponse(200, "OK", content, mime_type)
-        except FileNotFoundError:
+            self.SendResponse(200, "OK", content, mtype)
+        else:
             self.SendResponse(404, "Not Found")
+
 
     def ServerDirectory(self, path):
         if not self.data.splitlines()[0].split(' ')[1].endswith('/'):
@@ -83,15 +91,15 @@ class MyWebServer(socketserver.BaseRequestHandler):
         self.ServerFile(os.path.join(path, 'index.html'))
 
     def SendResponse(self, status_code, status_message, content="", content_type="text/html", location=None):
-        headers = [
+        response = [
             f"HTTP/1.1 {status_code} {status_message}",
             f"Content-Type: {content_type}",
             f"Content-Length: {len(content)}"
         ]
         if location:
-            headers.append(f"Location: {location}")
-        headers.append("\r\n")
-        response = "\r\n".join(headers) + content
+            response.append(f"Location: {location}")
+        response.append("\r\n")
+        response = "\r\n".join(response) + content
         self.request.sendall(response.encode('utf-8'))
 
 
