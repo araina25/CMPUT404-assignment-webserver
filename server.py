@@ -30,6 +30,8 @@ import mimetypes
 
 
 #MyWebserver is a class containing methods relating to handling HTTP and handles and implements all the requirements in requirement.org
+
+
 class MyWebServer(socketserver.BaseRequestHandler):
     
     #This is the abosulte path to the webserver(The servers root directory)
@@ -47,60 +49,81 @@ class MyWebServer(socketserver.BaseRequestHandler):
             self.SendResponse(405, "Method Not Allowed")
             return
 
-        
+        #Translating the local URL to a -- local file/directory path
         host_path = self.TranslatePath()
         
-        if not self.ValidPath(host_path):
+
+        if not self.ValidPath(host_path):#Verifying if the path is under the servers root directory 
             self.SendResponse(404, "Not Found")
             return
-
+        
         self.ServerPath(host_path)
 
+    #Translate Path is a function that will extract the path from the HTTP request generated.
     def TranslatePath(self):
-        path = self.data.splitlines()[0].split(' ')[1]
-        return os.path.abspath(os.path.join(self.Initialised_Directory, path.lstrip('/')))
+        extracted_path = self.data.splitlines()[0].split(' ')[1]
+        return os.path.abspath(os.path.join(self.Initialised_Directory, extracted_path.lstrip('/')))
+    #pass
     
+    #This funciton will check if it is a GET request  
     def GetRequest(self):
         return self.data.splitlines()[0].split(' ')[0] == 'GET'
+    #pass
 
-    
-    def ServerPath(self, path):
-        if os.path.isdir(path):
-            self.ServerDirectory(path)
+    #This will check if the path is a file or a directory 
+    def ServerPath(self, system_path):
+        if os.path.isdir(system_path):
+            self.ServerDirectory(system_path)
         else:
-            self.ServerFile(path)
+            self.ServerFile(system_path)
+    #pass
     
-    def ValidPath(self, path):
-        return path.startswith(self.Initialised_Directory)
+    #This function checks if if is a valid path or not -- which is checking if the path is within the servers root directory.
+    def ValidPath(self, system_path):
+        return system_path.startswith(self.Initialised_Directory)
+    
+    #pass
 
-    def ServerFile(self, path):
-        mtype, _ = mimetypes.guess_type(path)
+    #This function will serve a requested file
+    def ServerFile(self, system_path):
+        mtype, _ = mimetypes.guess_type(system_path)#Guessing the mime type for the file
 
-        if os.path.exists(path) and os.path.isfile(path):
-            with open(path, 'r') as file:
+        #Checking if the path exists or not and also is a file , then sending back and reading the file.
+        if os.path.exists(system_path) and os.path.isfile(system_path):
+            with open(system_path, 'r') as file:
                 content = file.read()
             self.SendResponse(200, "OK", content, mtype)
         else:
             self.SendResponse(404, "Not Found")
+    
+    #pass
 
 
-    def ServerDirectory(self, path):
+    #This function will serve a requested directory 
+    def ServerDirectory(self, system_path):
+        #Supporting the requirement that -- 
+        #Must use 301 to correct paths such as http://127.0.0.1:8080/deep to http://127.0.0.1:8080/deep/ (path ending)
         if not self.data.splitlines()[0].split(' ')[1].endswith('/'):
-            self.SendResponse(301, "Moved Permanently", location=self.data.splitlines()[0].split(' ')[1] + '/')
+            self.SendResponse(301, "Moved Permanently", h_redirection=self.data.splitlines()[0].split(' ')[1] + '/')#locating the Header value for redirection
             return
-        self.ServerFile(os.path.join(path, 'index.html'))
+        #Trying to serve the index.html file from the directory.
+        self.ServerFile(os.path.join(system_path, 'index.html'))
+        #pass
 
-    def SendResponse(self, status_code, status_message, content="", content_type="text/html", location=None):
+    #This function is resposible for giving back a HTTP response.
+    def SendResponse(self, status_code, status_message, content="", content_type="text/html", h_redirection=None):
+        #A list comprising of all HTTP response headers and content
         response = [
             f"HTTP/1.1 {status_code} {status_message}",
             f"Content-Type: {content_type}",
             f"Content-Length: {len(content)}"
         ]
-        if location:
-            response.append(f"Location: {location}")
+        if h_redirection:
+            response.append(f"h_redirection: {h_redirection}")
         response.append("\r\n")
         response = "\r\n".join(response) + content
         self.request.sendall(response.encode('utf-8'))
+        #pass
 
 
 
